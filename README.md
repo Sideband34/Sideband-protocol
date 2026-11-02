@@ -41,3 +41,13 @@ Stellar is essential: An online setup transaction deposits a supported Stellar a
 ## Official project identity
 
 The project uses the **approved flat SVG logo** in [`brand/icon.svg`](./brand/icon.svg), with an editable transparent vector mark in [`brand/mark.svg`](./brand/mark.svg). The [512 px GitHub organization avatar](./brand/org-avatar.png) is in the same directory. This logo is shared by all four project repositories. UI design remains intentionally flexible.
+
+## Status: M0/M1 core (v0.1.0)
+
+Implemented and tested (`dart test`, 27 tests): fixed-point `Amount` (7 decimals, no floats), canonical JSON, versioned frames (`service_offer`, `session_accept`, `meter_sample`, `voucher`, `session_close`, `error`) with strict decoding and size limits, a `SessionMachine` (offer/accept validation, nonce replay, monotonic voucher enforcement, meter checks), `UsageMeter`, and a `Transport`/`FrameChannel` contract with retry and backpressure plus an in-memory loopback.
+
+**Not implemented:** BLE / Wi-Fi Direct adapters (need physical-device testing), signature verification and voucher signing (owned by `sideband-channels`; `commitVoucher` must only be called after the caller has verified the signature), Testnet integration.
+
+```
+dart pub get && dart analyze && dart test && dart run example/loopback.dart
+```
