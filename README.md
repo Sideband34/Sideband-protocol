@@ -67,14 +67,15 @@ dependencies:
 |---|---|
 | Frames, canonical encoding, size limits | Implemented, tested |
 | Session state machine, nonce replay, monotonic vouchers | Implemented, tested |
-| Usage meter, transport contract, loopback | Implemented, tested (27 tests) |
-| BLE transport adapter | Not started: needs physical-device testing |
-| Local Wi-Fi / Wi-Fi Direct adapter | Not started |
+| Protocol v2: `session_accept.baseline`, several sessions per channel | Implemented, tested ([ADR 0001](docs/adr/0001-session-baseline.md)) |
+| Usage meter, transport contract, loopback | Implemented, tested (37 tests in total) |
+| BLE and LAN transport adapters | In Sideband-mobile (Flutter plugins): unit-tested with fakes, **untested on hardware** |
+| Transport-level session resume frame | Not started (the payer resumes over the gateway API today) |
 | Signature checks | Out of scope here (owned by Sideband-channels) |
 | Published package on pub.dev | No (consumed as a git dependency) |
 
 Consumers: [Sideband-mobile](https://github.com/Sideband34/Sideband-mobile) (frames, `SessionMachine`, `Amount`) and
-[Sideband-gateway](https://github.com/Sideband34/Sideband-gateway) (frame field names and limits, v1).
+[Sideband-gateway](https://github.com/Sideband34/Sideband-gateway) (frame field names and limits, v1 + v2 accept).
 
 ## How Sideband works
 

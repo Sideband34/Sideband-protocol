@@ -10,28 +10,25 @@ boundary per issue. Cross-repo work is listed at the end and needs a linked PR i
 
 ## Open work
 
-- [ ] **Android BLE transport adapter** (`lib/src/transport`). Implement `Transport` over BLE GATT
-  (advertise offer, negotiate, chunk frames under MTU, backpressure). *Acceptance:* passes the
-  existing transport contract tests via a fake BLE layer; documented permissions. *Non-goals:*
-  payment signing in transport code. *Size:* L.
-- [ ] **Local Wi-Fi upgrade path.** Negotiate over BLE, then move the session to a local socket
-  with the same session id. *Acceptance:* loopback test that switches transports mid-session
-  without losing or duplicating frames. *Size:* M.
-- [ ] **Frame schema snapshots.** Export JSON Schema for every v1 frame and check it into
-  `schema/`; CI fails on unreviewed changes. *Acceptance:* gateway and mobile fixtures validate
-  against it. *Size:* S. `good first issue`.
+- [ ] **Frame schema snapshots.** Export JSON Schema for every v1/v2 frame into `schema/`; CI fails
+  on unreviewed changes. *Acceptance:* gateway and mobile fixtures validate against it. *Size:* S.
+  `good first issue`.
 - [ ] **Fuzz the frame decoder.** Property tests for oversized, truncated and malformed frames.
-  *Acceptance:* no exception escapes `decode` other than the documented error type. *Size:* S.
-- [ ] **Session resume after disconnect.** Resume with the highest committed voucher and meter
-  sample instead of starting over. *Acceptance:* state-machine tests for resume, stale resume and
-  replayed resume. *Size:* M.
+  *Acceptance:* no exception escapes `decode` other than `FrameException`. *Size:* S.
+- [ ] **Transport switch mid-session.** Negotiate over BLE, then move the session to a LAN socket
+  with the same session id. *Acceptance:* loopback test that switches transports without losing or
+  duplicating frames. *Size:* M.
+- [ ] **Session resume frame.** The payer resumes today over the gateway HTTP API (journal +
+  re-attach). Define a transport-level `session_resume` frame (v3) with stale/replayed resume
+  rules. *Acceptance:* state-machine tests for resume, stale resume and replayed resume. *Size:* M.
 
 ## Cross-repository
 
 - [ ] **Integration lockfile.** A file in each repo pinning the tested sibling tags/SHAs, checked in
   CI. *Acceptance:* CI fails when a pinned sibling fixture differs. *Size:* M.
-- [ ] **Testnet end-to-end demo.** Fund → offline session → settle on Testnet with recorded
-  transaction hashes, driven from a clean checkout. *Blocked on:* channels Testnet deploy, gateway
-  Soroban wiring. *Size:* L.
-- [ ] **Physical-device compatibility harness.** Two-phone BLE/Wi-Fi run with a published matrix.
-  *Blocked on:* protocol transport adapters. *Size:* L.
+- [ ] **Testnet end-to-end demo.** Fund → offline session (two sessions on one channel) → settle on
+  Testnet with recorded transaction hashes, driven from a clean checkout. *Blocked on:* running
+  `scripts/deploy-testnet.sh` in Sideband-channels, gateway Soroban wiring. *Size:* L.
+- [ ] **Physical-device compatibility harness.** Two-phone BLE run of the mobile `BleTransport`
+  with a published matrix. *Acceptance:* a frame exchange of 10+ vouchers recorded per device
+  pair; no row marked supported without a run. *Size:* L.
