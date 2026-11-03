@@ -57,7 +57,13 @@ class SessionMachine {
   SessionPhase get phase => _phase;
   ServiceOffer? get offer => _offer;
   SessionAccept? get accept => _accept;
+
+  /// Highest channel-cumulative voucher amount seen (starts at the baseline).
   Amount get highestCumulative => _highest;
+
+  /// Amount committed in THIS session: highest minus the accepted baseline.
+  Amount get sessionSpend =>
+      _accept == null ? Amount.zero : _highest - _accept!.baseline;
   VoucherFrame? get highestVoucher => _highestVoucher;
 
   void _sessionMatch(Frame f) {
@@ -99,7 +105,15 @@ class SessionMachine {
 
   /// Provider receives the payer's accept. [knownChannelRefs] is the provider's
   /// cached set of funded channels bound to it (from online deposit proof).
-  void receiveAccept(SessionAccept a, {required Set<String> knownChannelRefs}) {
+  /// [channelCumulative] is the provider's highest accepted voucher on that
+  /// channel from earlier sessions; the payer's `baseline` must equal it
+  /// exactly (lower would let old commitments pay for new usage, higher would
+  /// make the payer pay twice).
+  void receiveAccept(
+    SessionAccept a, {
+    required Set<String> knownChannelRefs,
+    Amount? channelCumulative,
+  }) {
     _require(SessionPhase.offered, 'accept');
     _sessionMatch(a);
     final o = _offer!;
@@ -110,6 +124,13 @@ class SessionMachine {
       // No pre-funded channel: refuse to begin a paid session.
       throw SessionViolation('no_funded_channel', 'Channel not funded/bound');
     }
+    if (a.baseline != (channelCumulative ?? Amount.zero)) {
+      throw SessionViolation(
+        'baseline_mismatch',
+        'baseline ${a.baseline} != channel cumulative '
+            '${channelCumulative ?? Amount.zero}',
+      );
+    }
     if (!_seenNonces.add(a.nonce)) {
       throw SessionViolation('replayed_nonce', 'Nonce already used');
     }
@@ -118,6 +139,7 @@ class SessionMachine {
       throw SessionViolation('spend_exceeds_offer', 'maxSpend above offer cap');
     }
     _accept = a;
+    _highest = a.baseline;
     _phase = SessionPhase.active;
   }
 
@@ -130,6 +152,7 @@ class SessionMachine {
       throw SessionViolation('spend_exceeds_offer', 'maxSpend above offer cap');
     }
     _accept = a;
+    _highest = a.baseline;
     _phase = SessionPhase.active;
   }
 
@@ -155,16 +178,18 @@ class SessionMachine {
   /// `signature` is NOT done here; the caller must verify with
   /// `sideband-channels` BEFORE calling [commitVoucher].
   ///
-  /// Enforces: matching channel, cap, strictly monotonic cumulative amount.
+  /// Enforces: matching channel, session budget (`baseline + maxSpend`),
+  /// strictly monotonic cumulative amount above the baseline.
   /// Returns true if the voucher became the new highest.
   bool commitVoucher(VoucherFrame v) {
     _require(SessionPhase.active, 'voucher');
     _sessionMatch(v);
-    if (v.channelRef != _accept!.channelRef) {
+    final a = _accept!;
+    if (v.channelRef != a.channelRef) {
       throw SessionViolation('wrong_channel', 'Voucher for another channel');
     }
-    if (v.cumulativeAmount > _accept!.maxSpend) {
-      throw SessionViolation('over_budget', 'Voucher exceeds maxSpend');
+    if (v.cumulativeAmount > a.baseline + a.maxSpend) {
+      throw SessionViolation('over_budget', 'Voucher exceeds session budget');
     }
     if (v.cumulativeAmount <= _highest) {
       throw SessionViolation('non_monotonic', 'Voucher not above highest');

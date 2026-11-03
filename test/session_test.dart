@@ -26,12 +26,16 @@ ServiceOffer offer(
     );
 
 SessionAccept accept(
-        {String ch = 'C1', String max = '0.02', String nonce = 'n1'}) =>
+        {String ch = 'C1',
+        String max = '0.02',
+        String nonce = 'n1',
+        String baseline = '0'}) =>
     SessionAccept(
         session: 's1',
         channelRef: ch,
         maxSpend: Amount.parse(max),
-        nonce: nonce);
+        nonce: nonce,
+        baseline: Amount.parse(baseline));
 
 VoucherFrame voucher(String amt, {String ch = 'C1', String session = 's1'}) =>
     VoucherFrame(
@@ -160,5 +164,59 @@ void main() {
     expect(meter.owed, Amount.parse('0.0002'));
     expect(() => meter.record(2), throwsStateError);
     expect(() => meter.record(0), throwsArgumentError);
+  });
+
+  group('multiple sessions per channel (v2 baseline)', () {
+    SessionMachine second({String baseline = '0.015', String? known}) {
+      final m = SessionMachine(sessionId: 's1', now: () => 1000)
+        ..sendOffer(offer());
+      m.receiveAccept(accept(baseline: baseline, nonce: 'n2'),
+          knownChannelRefs: {'C1'},
+          channelCumulative: Amount.parse(known ?? baseline));
+      return m;
+    }
+
+    test('budget is measured from the baseline', () {
+      final m = second();
+      expect(m.highestCumulative, Amount.parse('0.015'));
+      expect(m.sessionSpend, Amount.zero);
+      m.commitVoucher(voucher('0.02'));
+      expect(m.sessionSpend, Amount.parse('0.005'));
+      m.commitVoucher(voucher('0.035')); // 0.015 + 0.02 = cap, inclusive
+      expect(m.sessionSpend, Amount.parse('0.02'));
+      expectCode(() => m.commitVoucher(voucher('0.0350001')), 'over_budget');
+    });
+    test('vouchers at or below the baseline are not new value', () {
+      final m = second();
+      expectCode(() => m.commitVoucher(voucher('0.015')), 'non_monotonic');
+      expectCode(() => m.commitVoucher(voucher('0.01')), 'non_monotonic');
+    });
+    test('provider refuses a baseline that differs from its records', () {
+      for (final claimed in ['0.01', '0.02']) {
+        expectCode(() => second(baseline: claimed, known: '0.015'),
+            'baseline_mismatch');
+      }
+      // A v1-style zero baseline on a used channel is also a mismatch.
+      expectCode(
+          () => second(baseline: '0', known: '0.015'), 'baseline_mismatch');
+    });
+    test('fresh channel: zero baseline with no provider history', () {
+      final m = SessionMachine(sessionId: 's1', now: () => 1000)
+        ..sendOffer(offer());
+      m.receiveAccept(accept(), knownChannelRefs: {'C1'});
+      expect(m.sessionSpend, Amount.zero);
+      expectCode(
+          () => SessionMachine(sessionId: 's1', now: () => 1000)
+            ..sendOffer(offer())
+            ..receiveAccept(accept(baseline: '0.01'), knownChannelRefs: {'C1'}),
+          'baseline_mismatch');
+    });
+    test('payer side starts its highest at the baseline too', () {
+      final m = SessionMachine(sessionId: 's1', now: () => 1000)
+        ..receiveOffer(offer(), policy)
+        ..sendAccept(accept(baseline: '0.5'));
+      expect(m.highestCumulative, Amount.parse('0.5'));
+      expect(m.sessionSpend, Amount.zero);
+    });
   });
 }

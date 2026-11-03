@@ -27,10 +27,12 @@ A pure Dart package that defines how a payer and a provider talk during a Sideba
 no UI, no networking stack of its own and no payment cryptography:
 
 - **Versioned frames** (`service_offer`, `session_accept`, `meter_sample`, `voucher`,
-  `session_close`, `error`) with strict decoding, size limits and canonical JSON.
+  `session_close`, `error`) with strict decoding, size limits and canonical JSON. Protocol v2
+  adds `session_accept.baseline` so several sequential sessions can share one funded channel
+  ([ADR 0001](docs/adr/0001-session-baseline.md)); v1 frames still decode.
 - **Fixed-point `Amount`** (7 decimals, integer arithmetic; no floats).
-- **`SessionMachine`**: offer/accept validation, one-time nonces, monotonic voucher enforcement,
-  meter checks.
+- **`SessionMachine`**: offer/accept validation, one-time nonces, per-session budgets measured
+  from the channel baseline, monotonic voucher enforcement, meter checks.
 - **`UsageMeter`** and a **`Transport` / `FrameChannel` contract** with retry and backpressure,
   plus an in-memory loopback for tests.
 
