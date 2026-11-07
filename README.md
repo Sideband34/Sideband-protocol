@@ -12,8 +12,10 @@ Part of [Sideband](#how-sideband-works): nearby services, metered value, Stellar
 [![License: MIT](https://img.shields.io/badge/license-MIT-FF8B24.svg)](./LICENSE)
 [![Status: pre-release](https://img.shields.io/badge/status-pre--release-130B12.svg)](#status)
 [![Network: Stellar Testnet only](https://img.shields.io/badge/network-Stellar%20Testnet%20only-130B12.svg)](./SECURITY.md)
+[![Docs](https://img.shields.io/badge/docs-GitBook%20source-FF8B24.svg)](https://github.com/Sideband34/Sideband-gateway/blob/main/gitbook/README.md)
+[![Stellar Wave](https://img.shields.io/badge/Drips-Stellar%20Wave-130B12.svg)](https://github.com/Sideband34/Sideband-protocol/issues?q=is%3Aissue+is%3Aopen+label%3A%22Stellar+Wave%22)
 
-[How it works](#how-sideband-works) · [Quickstart](#quickstart) · [Status](#status) · [Architecture](#architecture) · [Contributing](#contributing) · [Security](#security)
+[Docs](https://github.com/Sideband34/Sideband-gateway/blob/main/gitbook/README.md) · [Live site](https://sideband-web1.vercel.app) · [Quick start](#quick-start) · [Status](#status) · [Architecture](#how-it-fits-together) · [Contributing](#contributing) · [Security](#security)
 
 </div>
 
@@ -21,10 +23,11 @@ Part of [Sideband](#how-sideband-works): nearby services, metered value, Stellar
 > Pre-release software for **Stellar Testnet and synthetic assets only**. The channel contract and
 > voucher format are **unaudited**. Do not use with real funds.
 
-## What this repository is
+## What this is
 
-A pure Dart package that defines how a payer and a provider talk during a Sideband session, with
-no UI, no networking stack of its own and no payment cryptography:
+Sideband-protocol is the shared language of a Sideband session. When a phone and a nearby provider agree on a price, count the units used and exchange signed payment promises, they send each other the frames defined here. It is a small Dart library with strict decoding, size limits and a state machine that rejects replayed, reordered or over-budget messages. It has no UI, no networking stack and no payment cryptography of its own.
+
+What is inside:
 
 - **Versioned frames** (`service_offer`, `session_accept`, `meter_sample`, `voucher`,
   `session_close`, `error`) with strict decoding, size limits and canonical JSON. Protocol v2
@@ -40,7 +43,9 @@ Signature verification and voucher signing belong to
 [Sideband-channels](https://github.com/Sideband34/Sideband-channels); call `commitVoucher` only after the signature has
 been verified there.
 
-## Quickstart
+The full frame and session reference is in [docs/PROTOCOL.md](./docs/PROTOCOL.md).
+
+## Quick start
 
 Requires the Dart SDK 3.5+.
 
@@ -96,7 +101,7 @@ the session:
 A voucher is a commitment against already-locked funds, **not** a completed payment. Nothing is
 shown as settled until Stellar confirms it.
 
-## Architecture
+## How it fits together
 
 Four repositories, one responsibility each. No payment signing lives in transport code, and no
 chain logic lives in the app. This repository is highlighted.
@@ -133,30 +138,57 @@ Cross-repo contracts are pinned with fixtures: voucher golden vectors from `Side
 and a synthetic session transcript from `Sideband-gateway`. See
 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for data and ownership paths.
 
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Language | Dart 3.5 or newer, no Flutter dependency |
+| Tests | `package:test` (37 tests), `dart analyze --fatal-infos`, `dart format` |
+| Consumers | Sideband-mobile (git dependency), frame names mirrored in Sideband-gateway |
+
+## Project structure
+
+```
+lib/src/frames/      frames, canonical JSON, fixed-point Amount
+lib/src/handshake/   SessionMachine (offer, accept, vouchers, meter checks)
+lib/src/metering/    UsageMeter
+lib/src/transport/   Transport interface, loopback, FrameChannel with retries
+docs/PROTOCOL.md     the wire and session contract
+docs/adr/            architecture decisions
+example/             payer and provider over the loopback
+test/                unit tests for each area
+```
+
 ## Contributing
 
-Contributions are welcome. Start with [CONTRIBUTING.md](./CONTRIBUTING.md) for the local checks and
-workflow, and pick from the scoped work in
-[docs/CONTRIBUTOR_ISSUES.md](./docs/CONTRIBUTOR_ISSUES.md): each item lists its interfaces,
-acceptance tests and size. Please follow the [Code of Conduct](./CODE_OF_CONDUCT.md).
+Contributions are welcome. Start with [CONTRIBUTING.md](./CONTRIBUTING.md) for the local checks and the workflow, then pick an open issue labelled
+[`Stellar Wave`](https://github.com/Sideband34/Sideband-protocol/issues?q=is%3Aissue+is%3Aopen+label%3A%22Stellar+Wave%22). Each issue lists context, scope, implementation notes and
+acceptance criteria, and carries a `trivial`, `medium` or `high` complexity label. New here? Try [`good first issue`](https://github.com/Sideband34/Sideband-protocol/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+Please follow the [Code of Conduct](./CODE_OF_CONDUCT.md).
 
-**Drips Wave.** Sideband intends to participate in
-[Drips Wave](https://docs.drips.network/wave/maintainers/participating-in-a-wave/) on Stellar.
-Participation and rewards depend on organizer approval and are not guaranteed. Wave issues are
-real, scoped work in this repository's boundary, never filler.
+**Drips Wave.** Sideband applies to [Drips Wave](https://docs.drips.network/wave) on Stellar. Acceptance and rewards depend on the organizers and are not guaranteed.
 
 ## Security
 
-Please report vulnerabilities privately; see [SECURITY.md](./SECURITY.md). The threat model is
-in [docs/SECURITY.md](./docs/SECURITY.md). Never post keys or seeds in issues, even Testnet ones.
+Report vulnerabilities privately, as described in [SECURITY.md](./SECURITY.md). The threat model and what is not covered are in [docs/SECURITY.md](./docs/SECURITY.md).
+This is a Testnet prototype and has not been audited. Never post keys or seeds in an issue, even Testnet ones.
 
-## Project documents
+## Community
 
-[PRD](./docs/PRD.md) · [Requirements](./docs/SRD.md) · [Architecture](./docs/ARCHITECTURE.md) ·
-[Stellar protocol](./docs/STELLAR_PROTOCOL.md) · [Roadmap](./docs/ROADMAP.md) ·
-[Brand](./docs/BRAND.md) · [Agent rules](./AGENTS.md)
+Questions and ideas: [GitHub Discussions](https://github.com/Sideband34/Sideband-protocol/discussions).
+<!-- Owner: add the community invite link (Telegram or Discord) on this line when it exists. -->
 
-The approved logo is in [`brand/`](./brand) and shared by all four repositories.
+## Maintainers
+
+| Maintainer | Role | Contact |
+|---|---|---|
+| [Cjay-Cyber-2](https://github.com/Cjay-Cyber-2) | Maintainer | GitHub [issues](https://github.com/Sideband34/Sideband-protocol/issues) and [Discussions](https://github.com/Sideband34/Sideband-protocol/discussions) |
+
+## Contributors
+
+<a href="https://github.com/Sideband34/Sideband-protocol/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Sideband34/Sideband-protocol" alt="Contributors" />
+</a>
 
 ## License
 
