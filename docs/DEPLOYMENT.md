@@ -1,34 +1,36 @@
-# Sideband — Environment, Deployment and Recovery
+# Releasing and consuming Sideband-protocol
 
-## Environment boundaries
-- Local: deterministic Docker Compose services, Stellar local network/Testnet, synthetic users/fixtures.
-- Staging: separate database, bucket, API credentials, signing identities, Testnet assets/contracts, observability.
-- Production: requires security audit, real issuer/provider agreements and relevant jurisdictional legal/compliance review. Not included in preimplementation scaffold.
+Sideband-protocol is a Dart library. There is nothing to deploy: it is released as a git tag and consumed as a git dependency.
 
-## Suggested variables (non-secret examples only)
-```dotenv
-APP_ENV=development
-STELLAR_NETWORK=testnet
-STELLAR_RPC_URL=https://soroban-testnet.stellar.org
-HORIZON_URL=https://horizon-testnet.stellar.org
-DATABASE_URL=postgresql://localhost:5432/sideband
-REDIS_URL=redis://localhost:6379
-API_BASE_URL=http://localhost:3001
-CHAIN_START_LEDGER=0
-LOG_LEVEL=info
+## Consuming it
+
+```yaml
+dependencies:
+  sideband_protocol:
+    git:
+      url: https://github.com/Sideband34/Sideband-protocol.git
+      ref: v0.1.0   # or main
 ```
-- Credentials to sign on-chain go into a secure secret manager or hardware-backed user wallet, never into a public mobile/web bundle.
-- Signed store badge links are configured after actual publication; no fabricated App Store or Google Play app URLs.
 
-## CI & GitHub setup
-- GitHub Actions per repo: formatting/lint, schema checks, unit tests, dependency scanning; chain/devices smoke tests where supported.
-- Branch protection and PR review recommended.
-- Release tag points to tested sibling versions in an integration lockfile.
-- All paths use offline/synthetic test fixtures, not real user financial records.
+Sideband-mobile depends on it this way. Sideband-gateway mirrors the frame field names and limits and pins them with a synthetic session transcript fixture.
 
-## Failure recovery
-- Rebuild indexers from ledger cursor; compare DB projection vs chain truth.
-- Restore DB backups after verifying transaction-intent reconciliation.
-- Never republish user transactions solely because a client request timed out.
-- Test signing-key rotation, dependency outages, stale quotes, malicious user input, insufficient balances and duplicate delivery.
-- External reference infrastructure may change; check upstream project versions and licenses at build time.
+## Checks that gate every change
+
+CI runs on every push and pull request (`.github/workflows/ci.yml`, job `test`):
+
+```bash
+dart pub get
+dart format --output=none --set-exit-if-changed .
+dart analyze --fatal-infos
+dart test
+```
+
+The `docs` job (`.github/workflows/docs.yml`) checks that the required project documents exist and that relative markdown links resolve.
+
+## Environment boundary
+
+Testnet and synthetic data only. There is no staging or production environment for this package, and no secrets are used anywhere in it.
+
+## Releases
+
+Tags are lowercase `vX.Y.Z`. Each release lists the sibling versions it was tested with. Frame or voucher format changes need a version bump, updated fixtures and a linked change in every consumer. See [ADR 0001](./adr/0001-session-baseline.md) for the protocol v2 baseline.

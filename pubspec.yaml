@@ -1,6 +1,6 @@
 name: sideband_protocol
 description: Transport-agnostic local session protocol for Sideband metered services (frames, handshake, metering, transport contracts).
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/Sideband34/Sideband-protocol
 publish_to: none
 

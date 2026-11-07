@@ -3,8 +3,18 @@ import 'dart:convert';
 import 'amount.dart';
 import 'canonical.dart';
 
-/// Current wire version. Frames with any other version are rejected.
-const int protocolVersion = 1;
+/// Latest wire version understood by this package.
+///
+/// v2 (ADR 0001) adds `baseline` to `session_accept`: the channel's cumulative
+/// voucher amount when the session starts, so several sequential sessions can
+/// share one channel while each keeps its own `maxSpend` budget. Every other
+/// frame is unchanged, so frames are encoded with the LOWEST version that can
+/// represent them: only a `session_accept` with a non-zero baseline is v2, and
+/// everything else stays byte-identical to v1.
+const int protocolVersion = 2;
+
+/// Versions accepted by [Frame.decode]. Anything else is rejected.
+const Set<int> supportedProtocolVersions = {1, 2};
 
 /// Maximum accepted size of one encoded frame (anti-DoS bound).
 const int maxFrameBytes = 16 * 1024;
@@ -25,11 +35,14 @@ sealed class Frame {
 
   String get type;
 
+  /// Wire version this frame is encoded with (see [protocolVersion]).
+  int get version => 1;
+
   Map<String, Object?> body();
 
   Map<String, Object?> toJson() => {
         'type': type,
-        'v': protocolVersion,
+        'v': version,
         'session': session,
         ...body(),
       };
@@ -56,7 +69,7 @@ sealed class Frame {
       throw FrameException('Frame must be object');
     }
     final v = j['v'];
-    if (v != protocolVersion) {
+    if (v is! int || !supportedProtocolVersions.contains(v)) {
       throw FrameException('Unsupported protocol version: $v');
     }
     final type = _str(j, 'type');
@@ -76,11 +89,22 @@ sealed class Frame {
             expiresAt: _int(j, 'expiresAt'),
           );
         case 'session_accept':
+          final Amount baseline;
+          if (v == 1) {
+            // v1 has no baseline: the channel must be fresh for this session.
+            if (j.containsKey('baseline')) {
+              throw FrameException('v1 session_accept cannot carry baseline');
+            }
+            baseline = Amount.zero;
+          } else {
+            baseline = Amount.parse(_str(j, 'baseline'));
+          }
           return SessionAccept(
             session: session,
             channelRef: _str(j, 'channelRef'),
             maxSpend: Amount.parse(_str(j, 'maxSpend')),
             nonce: _str(j, 'nonce'),
+            baseline: baseline,
           );
         case 'meter_sample':
           return MeterSample(
@@ -173,25 +197,37 @@ class ServiceOffer extends Frame {
 }
 
 class SessionAccept extends Frame {
-  const SessionAccept({
+  SessionAccept({
     required super.session,
     required this.channelRef,
     required this.maxSpend,
     required this.nonce,
-  });
+    Amount? baseline,
+  }) : baseline = baseline ?? Amount.zero;
 
   final String channelRef;
+
+  /// Budget for THIS session, on top of [baseline].
   final Amount maxSpend;
   final String nonce;
 
+  /// Channel cumulative amount already committed when this session starts
+  /// (v2). Vouchers stay cumulative per channel, so this session may sign up
+  /// to `baseline + maxSpend`. Zero for a fresh channel (encoded as v1).
+  final Amount baseline;
+
   @override
   String get type => 'session_accept';
+
+  @override
+  int get version => baseline == Amount.zero ? 1 : 2;
 
   @override
   Map<String, Object?> body() => {
         'channelRef': channelRef,
         'maxSpend': maxSpend.toString(),
         'nonce': nonce,
+        if (version >= 2) 'baseline': baseline.toString(),
       };
 }
 
