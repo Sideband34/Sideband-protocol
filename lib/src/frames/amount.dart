@@ -23,6 +23,18 @@ class Amount implements Comparable<Amount> {
     return Amount._(whole * _unit + BigInt.parse(frac));
   }
 
+  /// Parses a non-negative decimal string, or returns `null` if [s] is invalid.
+  ///
+  /// Uses the same syntax rules as [Amount.parse], rejecting signs, exponents,
+  /// whitespace, and more than 7 fractional digits.
+  static Amount? tryParse(String s) {
+    try {
+      return Amount.parse(s);
+    } on FormatException {
+      return null;
+    }
+  }
+
   factory Amount.fromStroops(BigInt v) {
     if (v.isNegative) throw RangeError('Amount cannot be negative');
     return Amount._(v);
