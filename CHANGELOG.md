@@ -10,6 +10,7 @@ All notable changes to Sideband-protocol. Pre-release; Testnet/synthetic only.
 - `SessionMachine.receiveAccept(channelCumulative:)` refuses a mismatched baseline
   (`baseline_mismatch`); budgets are `baseline + maxSpend`; `sessionSpend` getter.
 - `supportedProtocolVersions = {1, 2}`.
+- Optional `delay` and `maxDelay` parameters on `FrameChannel` so tests and callers can inject fake-clock retry scheduling and cap exponential backoff.
 
 ### Changed
 - Frames encode with the lowest version that can represent them: only a `session_accept` with a
