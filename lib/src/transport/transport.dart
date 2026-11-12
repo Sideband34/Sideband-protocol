@@ -41,18 +41,30 @@ class InMemoryTransport implements Transport {
 
 /// Wraps a [Transport] with typed frames, bounded send queue (backpressure) and
 /// bounded retries with exponential backoff.
+///
+/// Failed [Transport.send] calls are retried up to [maxAttempts] total tries
+/// with backoff sequence `baseDelay * 2^(attempt - 1)` between attempts
+/// `1..maxAttempts - 1` (capped at [maxDelay] when provided).
 class FrameChannel {
   FrameChannel(
     this._t, {
     this.maxQueue = 64,
     this.maxAttempts = 3,
     this.baseDelay = const Duration(milliseconds: 50),
-  });
+    this.maxDelay,
+    Future<void> Function(Duration)? delay,
+  }) : _delay = delay ?? Future<void>.delayed {
+    if (maxAttempts < 1) {
+      throw ArgumentError.value(maxAttempts, 'maxAttempts', 'must be >= 1');
+    }
+  }
 
   final Transport _t;
   final int maxQueue;
   final int maxAttempts;
   final Duration baseDelay;
+  final Duration? maxDelay;
+  final Future<void> Function(Duration) _delay;
   int _pending = 0;
 
   /// Decoded frames. Undecodable input is surfaced as stream errors rather
@@ -72,7 +84,10 @@ class FrameChannel {
           return;
         } catch (_) {
           if (attempt >= maxAttempts) rethrow;
-          await Future<void>.delayed(baseDelay * (1 << (attempt - 1)));
+          final shift = (attempt - 1).clamp(0, 30);
+          final raw = baseDelay * (1 << shift);
+          final wait = maxDelay != null && raw > maxDelay! ? maxDelay! : raw;
+          await _delay(wait);
         }
       }
     } finally {

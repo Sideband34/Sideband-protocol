@@ -63,6 +63,97 @@ void main() {
     expect(errors.single, isA<FrameException>());
     await sub.cancel();
   });
+  test('succeeds on the first try with zero delays', () async {
+    final delays = <Duration>[];
+    final t = _RecordingTransport(failures: 0);
+    final ch = FrameChannel(t, delay: (d) async => delays.add(d));
+    await ch.send(const SessionClose(session: 's', reason: 'r'));
+    expect(t.attempts, 1);
+    expect(t.sent, hasLength(1));
+    expect(delays, isEmpty);
+  });
+  test('succeeds after two failures with documented backoff sequence',
+      () async {
+    final delays = <Duration>[];
+    final t = _RecordingTransport(failures: 2);
+    final ch = FrameChannel(t, delay: (d) async => delays.add(d));
+    await ch.send(const SessionClose(session: 's', reason: 'r'));
+    expect(t.attempts, 3);
+    expect(t.sent, hasLength(1));
+    expect(delays, const [
+      Duration(milliseconds: 50),
+      Duration(milliseconds: 100),
+    ]);
+  });
+  test('rethrows original error after maxAttempts tries and frees queue slot',
+      () async {
+    final delays = <Duration>[];
+    final err = ArgumentError('radio offline');
+    final t = _RecordingTransport(failures: 10, error: err);
+    final ch = FrameChannel(
+      t,
+      maxQueue: 1,
+      maxAttempts: 4,
+      delay: (d) async => delays.add(d),
+    );
+    await expectLater(
+      ch.send(const SessionClose(session: 's', reason: 'r')),
+      throwsA(same(err)),
+    );
+    expect(t.attempts, 4);
+    expect(delays, const [
+      Duration(milliseconds: 50),
+      Duration(milliseconds: 100),
+      Duration(milliseconds: 200),
+    ]);
+    t.failures = 0;
+    await ch.send(const SessionClose(session: 's', reason: 'recovered'));
+    expect(t.sent, hasLength(1));
+  });
+  test('exponential backoff grows up to maxDelay cap', () async {
+    final delays = <Duration>[];
+    final t = _RecordingTransport(failures: 4);
+    final ch = FrameChannel(
+      t,
+      maxAttempts: 5,
+      baseDelay: const Duration(milliseconds: 50),
+      maxDelay: const Duration(milliseconds: 150),
+      delay: (d) async => delays.add(d),
+    );
+    await ch.send(const SessionClose(session: 's', reason: 'r'));
+    expect(t.attempts, 5);
+    expect(delays, const [
+      Duration(milliseconds: 50),
+      Duration(milliseconds: 100),
+      Duration(milliseconds: 150),
+      Duration(milliseconds: 150),
+    ]);
+  });
+  test('rejects maxAttempts below 1', () {
+    final t = _RecordingTransport(failures: 0);
+    expect(() => FrameChannel(t, maxAttempts: 0), throwsArgumentError);
+  });
+}
+
+class _RecordingTransport implements Transport {
+  _RecordingTransport({required this.failures, this.error});
+  int failures;
+  final Object? error;
+  int attempts = 0;
+  final sent = <String>[];
+
+  @override
+  Stream<String> get incoming => const Stream.empty();
+
+  @override
+  Future<void> send(String f) async {
+    attempts++;
+    if (failures-- > 0) throw error ?? StateError('link down');
+    sent.add(f);
+  }
+
+  @override
+  Future<void> close() async {}
 }
 
 class _Slow implements Transport {
